@@ -8,7 +8,7 @@ from exceptions.custom_exceptions import (
 )
 from datetime import datetime
 
-# ① Tambahan Layer 1: Import fungsi CRUD dari database
+# Tambahan Layer 1: Import fungsi CRUD dari database
 from database.db_handler import (
     init_db, simpan_mahasiswa, ambil_semua_mahasiswa,
     update_persentase_kehadiran, simpan_nilai, ambil_nilai_mahasiswa
