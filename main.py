@@ -8,11 +8,18 @@ from exceptions.custom_exceptions import (
 )
 from datetime import datetime
 
-# Tambahan Layer 1: Import fungsi CRUD dari database
+# ① Tambahan Layer 1: Import fungsi CRUD dari database
 from database.db_handler import (
     init_db, simpan_mahasiswa, ambil_semua_mahasiswa,
     update_persentase_kehadiran, simpan_nilai, ambil_nilai_mahasiswa
 )
+
+# ⑤ Tambahan Layer 2: Import API Client
+from services.api_client import harga_dalam_mata_uang
+
+# Konstanta Biaya Remedial
+BIAYA_REMEDIAL_PER_SKS = 100_000   # Rp100.000 per SKS
+SKS_MATA_KULIAH = 4                # sesuai RPS Pemrograman Lanjut
 
 def menu_utama(sistem: SistemAkademik):
     """
@@ -30,11 +37,12 @@ def menu_utama(sistem: SistemAkademik):
         print("5. Input Nilai Mahasiswa")
         print("6. Rekap Peringkat & Nilai Kelas")
         print("7. Laporan Mahasiswa (Kehadiran < 75%)")
-        print("8. Tampilkan dari Database (SQLite)") # ④ Menu Baru Layer 1
+        print("8. Tampilkan dari Database (SQLite)")
+        print("9. Cek Estimasi Biaya Remedial") # ⑤ Menu Baru Layer 2
         print("0. Keluar")
         print("-" * 40)
         
-        pilihan = input("Pilih menu (0-8): ")
+        pilihan = input("Pilih menu (0-9): ")
         
         try:
             if pilihan == '1':
@@ -75,7 +83,6 @@ def menu_utama(sistem: SistemAkademik):
                 pesan = sistem.catat_absensi(nim, pertemuan, status)
                 
                 # ③ Tambahan Layer 1: Update Persentase Kehadiran di Database
-                # Ambil objek mahasiswa dari OOP untuk melihat persentase terbarunya
                 mhs = sistem.cari_mahasiswa(nim)
                 persentase_baru = mhs.absensi.persentase_hadir()
                 update_persentase_kehadiran(nim, persentase_baru)
@@ -91,7 +98,6 @@ def menu_utama(sistem: SistemAkademik):
                 pesan = sistem.input_nilai(nim, jenis, nilai)
                 
                 # ③ Tambahan Layer 1: Simpan Nilai ke Database
-                # Kita perlu mencari ID Database mahasiswa berdasarkan NIM-nya
                 daftar_mhs_db = ambil_semua_mahasiswa()
                 mhs_db = next((m for m in daftar_mhs_db if m.nim == nim), None)
                 
@@ -109,7 +115,6 @@ def menu_utama(sistem: SistemAkademik):
                 sistem.laporan_kehadiran_kurang()
                 
             elif pilihan == '8':
-                # ④ Tambahan Layer 1: Tampilkan data asli dari Database SQLite
                 print("\n-- DATA MAHASISWA DARI DATABASE SQLITE --")
                 daftar_mhs_db = ambil_semua_mahasiswa()
                 
@@ -118,33 +123,49 @@ def menu_utama(sistem: SistemAkademik):
                 else:
                     for m in daftar_mhs_db:
                         print(f"[{m.nim}] {m.nama} (Semester {m.semester}) - Kehadiran: {m.persentase_kehadiran}%")
+            
+            elif pilihan == '9':
+                # ⑤ Tambahan Layer 2: Fitur API Estimasi Biaya
+                print("\n-- CEK ESTIMASI BIAYA REMEDIAL --")
+                nim = input("Masukkan NIM Mahasiswa: ")
                 
+                # Cari mahasiswa; jika tidak ada, otomatis memicu MahasiswaTidakDitemukanError
+                mhs = sistem.cari_mahasiswa(nim)
+                nilai = mhs.nilai_akhir()
+                
+                if nilai < 60:
+                    biaya_idr = BIAYA_REMEDIAL_PER_SKS * SKS_MATA_KULIAH
+                    mata_uang = input("Tampilkan dalam mata uang asing? (kosongkan untuk skip): ").strip()
+                    
+                    if mata_uang:
+                        try:
+                            # Memanggil fungsi API dari api_client.py
+                            hasil_konversi = harga_dalam_mata_uang(biaya_idr, mata_uang)
+                            print(f"Mahasiswa perlu remedial. Estimasi biaya: Rp{biaya_idr:,} (≈ {hasil_konversi})")
+                        except (ConnectionError, ValueError) as e:
+                            # Menangkap error jaringan atau mata uang ngawur, jadi program nggak crash
+                            print(f"⚠️ [API ERROR] {e}")
+                            print(f"Mahasiswa perlu remedial. Estimasi biaya: Rp{biaya_idr:,}")
+                    else:
+                        print(f"Mahasiswa perlu remedial. Estimasi biaya: Rp{biaya_idr:,}")
+                else:
+                    print("✅ Mahasiswa sudah lulus, tidak perlu remedial.")
+                    
             elif pilihan == '0':
                 print("👋 Keluar dari program. Terima kasih!")
                 break
                 
             else:
-                print("⚠️ [PERINGATAN] Pilihan tidak valid, silakan pilih angka 0-8.")
+                print("⚠️ [PERINGATAN] Pilihan tidak valid, silakan pilih angka 0-9.")
                 
-        # Menangkap error jika user salah memasukkan huruf pada input bertipe angka
         except ValueError:
             print("❌ [ERROR INPUT] Masukan tidak valid! Pastikan kolom Semester, Pertemuan, atau Nilai diisi dengan angka.")
-        
-        # Menangkap custom exception yang dilempar oleh core program
         except (NIMDuplikatError, MahasiswaTidakDitemukanError, NilaiTidakValidError, AbsensiDuplikatError) as e:
             print(f"❌ [ERROR SISTEM] {e}")
-            
-        # Menangkap error tidak terduga lainnya agar program tetap berjalan
         except Exception as e:
             print(f"❌ [FATAL ERROR] Terjadi kesalahan sistem: {e}")
 
-# Blok pengeksekusi utama program
 if __name__ == '__main__':
-    # ② Panggil init_db() SEBELUM menu muncul
     init_db()
-    
-    # Membuat instance dari core service
     sistem_akademik = SistemAkademik()
-    
-    # Menjalankan fungsi menu utama
     menu_utama(sistem_akademik)
