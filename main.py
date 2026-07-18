@@ -8,24 +8,28 @@ from exceptions.custom_exceptions import (
 )
 from datetime import datetime
 
-# ① Tambahan Layer 1: Import fungsi CRUD dari database
+# ① Import fungsionalitas Layer 1 (Database)
 from database.db_handler import (
     init_db, simpan_mahasiswa, ambil_semua_mahasiswa,
     update_persentase_kehadiran, simpan_nilai, ambil_nilai_mahasiswa
 )
 
-# ⑤ Tambahan Layer 2: Import API Client
+# ⑤ Import fungsionalitas Layer 2 (API)
 from services.api_client import harga_dalam_mata_uang
 
+# ⑧ Import fungsionalitas Layer 2 (Functional Programming)
+from services.laporan import (
+    mahasiswa_lulus, 
+    rata_rata_per_komponen, 
+    mahasiswa_kehadiran_rendah, 
+    ringkasan_kelas
+)
+
 # Konstanta Biaya Remedial
-BIAYA_REMEDIAL_PER_SKS = 100_000   # Rp100.000 per SKS
-SKS_MATA_KULIAH = 4                # sesuai RPS Pemrograman Lanjut
+BIAYA_REMEDIAL_PER_SKS = 100_000
+SKS_MATA_KULIAH = 4
 
 def menu_utama(sistem: SistemAkademik):
-    """
-    Fungsi menu utama untuk mengendalikan antarmuka CLI.
-    Menerima parameter objek dari kelas SistemAkademik sebagai controller.
-    """
     while True:
         print("\n" + "="*40)
         print("🎓 SISTEM INFORMASI AKADEMIK CLI 🎓")
@@ -38,11 +42,12 @@ def menu_utama(sistem: SistemAkademik):
         print("6. Rekap Peringkat & Nilai Kelas")
         print("7. Laporan Mahasiswa (Kehadiran < 75%)")
         print("8. Tampilkan dari Database (SQLite)")
-        print("9. Cek Estimasi Biaya Remedial") # ⑤ Menu Baru Layer 2
+        print("9. Cek Estimasi Biaya Remedial")
+        print("10. Menu Laporan (Functional Programming)") # ⑧ Menu Baru untuk Layer 2 (FP)
         print("0. Keluar")
         print("-" * 40)
         
-        pilihan = input("Pilih menu (0-9): ")
+        pilihan = input("Pilih menu (0-10): ")
         
         try:
             if pilihan == '1':
@@ -55,12 +60,11 @@ def menu_utama(sistem: SistemAkademik):
                 mhs = Mahasiswa(nama, nim, email, semester)
                 pesan = sistem.tambah_mahasiswa(mhs)
                 
-                # ③ Tambahan Layer 1: Simpan ke Database
                 simpan_mahasiswa(nim, nama, semester)
-                
                 print(f"✅ [SUKSES] {pesan}")
                 
             elif pilihan == '2':
+                # (Sama seperti sebelumnya)
                 print("\n-- TAMBAH DOSEN --")
                 nama = input("Masukkan Nama: ")
                 nidn = input("Masukkan NIDN: ")
@@ -82,11 +86,8 @@ def menu_utama(sistem: SistemAkademik):
                 
                 pesan = sistem.catat_absensi(nim, pertemuan, status)
                 
-                # ③ Tambahan Layer 1: Update Persentase Kehadiran di Database
                 mhs = sistem.cari_mahasiswa(nim)
-                persentase_baru = mhs.absensi.persentase_hadir()
-                update_persentase_kehadiran(nim, persentase_baru)
-                
+                update_persentase_kehadiran(nim, mhs.absensi.persentase_hadir())
                 print(f"✅ [SUKSES] {pesan}")
                 
             elif pilihan == '5':
@@ -97,13 +98,11 @@ def menu_utama(sistem: SistemAkademik):
                 
                 pesan = sistem.input_nilai(nim, jenis, nilai)
                 
-                # ③ Tambahan Layer 1: Simpan Nilai ke Database
                 daftar_mhs_db = ambil_semua_mahasiswa()
                 mhs_db = next((m for m in daftar_mhs_db if m.nim == nim), None)
-                
                 if mhs_db:
-                    waktu_sekarang = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                    simpan_nilai(mhs_db.id, jenis, nilai, waktu_sekarang)
+                    waktu = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                    simpan_nilai(mhs_db.id, jenis, nilai, waktu)
                 
                 print(f"✅ [SUKSES] {pesan}")
                 
@@ -117,7 +116,6 @@ def menu_utama(sistem: SistemAkademik):
             elif pilihan == '8':
                 print("\n-- DATA MAHASISWA DARI DATABASE SQLITE --")
                 daftar_mhs_db = ambil_semua_mahasiswa()
-                
                 if not daftar_mhs_db:
                     print("Belum ada data di database.")
                 else:
@@ -125,41 +123,78 @@ def menu_utama(sistem: SistemAkademik):
                         print(f"[{m.nim}] {m.nama} (Semester {m.semester}) - Kehadiran: {m.persentase_kehadiran}%")
             
             elif pilihan == '9':
-                # ⑤ Tambahan Layer 2: Fitur API Estimasi Biaya
                 print("\n-- CEK ESTIMASI BIAYA REMEDIAL --")
                 nim = input("Masukkan NIM Mahasiswa: ")
-                
-                # Cari mahasiswa; jika tidak ada, otomatis memicu MahasiswaTidakDitemukanError
                 mhs = sistem.cari_mahasiswa(nim)
                 nilai = mhs.nilai_akhir()
                 
                 if nilai < 60:
                     biaya_idr = BIAYA_REMEDIAL_PER_SKS * SKS_MATA_KULIAH
                     mata_uang = input("Tampilkan dalam mata uang asing? (kosongkan untuk skip): ").strip()
-                    
                     if mata_uang:
                         try:
-                            # Memanggil fungsi API dari api_client.py
-                            hasil_konversi = harga_dalam_mata_uang(biaya_idr, mata_uang)
-                            print(f"Mahasiswa perlu remedial. Estimasi biaya: Rp{biaya_idr:,} (≈ {hasil_konversi})")
+                            hasil = harga_dalam_mata_uang(biaya_idr, mata_uang)
+                            print(f"Mahasiswa perlu remedial. Estimasi biaya: Rp{biaya_idr:,} (≈ {hasil})")
                         except (ConnectionError, ValueError) as e:
-                            # Menangkap error jaringan atau mata uang ngawur, jadi program nggak crash
                             print(f"⚠️ [API ERROR] {e}")
                             print(f"Mahasiswa perlu remedial. Estimasi biaya: Rp{biaya_idr:,}")
                     else:
                         print(f"Mahasiswa perlu remedial. Estimasi biaya: Rp{biaya_idr:,}")
                 else:
                     print("✅ Mahasiswa sudah lulus, tidak perlu remedial.")
+
+            elif pilihan == '10':
+                print("\n-- MENU LAPORAN (FUNCTIONAL PROGRAMMING) --")
+                print("1. Peringkat Kelulusan (Nilai >= 60)")
+                print("2. Rata-rata per Komponen (Tugas/UTS/UAS)")
+                print("3. Mahasiswa Kehadiran Rendah (< 75%)")
+                print("4. Ringkasan Keseluruhan Kelas")
+                
+                sub_pilihan = input("Pilih laporan (1-4): ")
+                
+                # Mengambil data list mahasiswa langsung dari atribut sistem
+                data_mhs = getattr(sistem, '_daftar_mahasiswa', getattr(sistem, 'daftar_mahasiswa', []))
+                
+                if not data_mhs:
+                    print("⚠️ Data mahasiswa masih kosong. Silakan tambah mahasiswa terlebih dahulu.")
+                else:
+                    if sub_pilihan == '1':
+                        print("\n📊 PERINGKAT KELULUSAN:")
+                        lulus = mahasiswa_lulus(data_mhs)
+                        if not lulus: print("- Belum ada mahasiswa yang lulus.")
+                        for i, m in enumerate(lulus, 1):
+                            print(f"{i}. {m.nama} (NIM: {getattr(m, 'id_pengguna', getattr(m, 'nim', ''))}) - Nilai: {m.nilai_akhir():.1f}")
+                            
+                    elif sub_pilihan == '2':
+                        print("\n📊 RATA-RATA KOMPONEN KELAS:")
+                        rata_rata = rata_rata_per_komponen(data_mhs)
+                        for komponen, nilai in rata_rata.items():
+                            print(f"- {komponen}: {nilai:.1f}")
+                            
+                    elif sub_pilihan == '3':
+                        print("\n⚠️ KEHADIRAN RENDAH (< 75%):")
+                        kritis = mahasiswa_kehadiran_rendah(data_mhs)
+                        if not kritis: print("- Semua mahasiswa memiliki kehadiran aman.")
+                        for m in kritis:
+                            print(f"- {m.nama} (Kehadiran: {m.absensi.persentase_hadir():.0f}%)")
+                            
+                    elif sub_pilihan == '4':
+                        print("\n📝 RINGKASAN KELAS:")
+                        ringkasan = ringkasan_kelas(data_mhs)
+                        for baris in ringkasan:
+                            print(baris)
+                    else:
+                        print("❌ Pilihan sub-menu tidak valid.")
                     
             elif pilihan == '0':
                 print("👋 Keluar dari program. Terima kasih!")
                 break
                 
             else:
-                print("⚠️ [PERINGATAN] Pilihan tidak valid, silakan pilih angka 0-9.")
+                print("⚠️ [PERINGATAN] Pilihan tidak valid.")
                 
         except ValueError:
-            print("❌ [ERROR INPUT] Masukan tidak valid! Pastikan kolom Semester, Pertemuan, atau Nilai diisi dengan angka.")
+            print("❌ [ERROR INPUT] Masukan tidak valid! Pastikan pengisian angka sudah benar.")
         except (NIMDuplikatError, MahasiswaTidakDitemukanError, NilaiTidakValidError, AbsensiDuplikatError) as e:
             print(f"❌ [ERROR SISTEM] {e}")
         except Exception as e:

@@ -110,3 +110,62 @@ def test_relasi_mahasiswa_nilai(db):
     db.refresh(mhs)
     assert len(mhs.nilai_list) == 1
     assert mhs.nilai_list[0].komponen == "UTS"
+
+
+# --- TAMBAHAN LAYER 2: TEST REST API & FUNCTIONAL PROGRAMMING ---
+from unittest.mock import patch, MagicMock
+from services.api_client import get_kurs
+import requests
+from services.laporan import mahasiswa_lulus
+
+def test_get_kurs_berhasil():
+    # Membuat 'aktor pengganti' untuk response API
+    mock_resp = MagicMock()
+    mock_resp.json.return_value = {"rates": {"USD": 0.000064}}
+    mock_resp.raise_for_status.return_value = None
+    
+    # Mengganti fungsi requests.get asli dengan yang palsu selama blok 'with' berjalan
+    with patch("services.api_client.requests.get", return_value=mock_resp):
+        hasil = get_kurs("USD")
+        assert hasil == 0.000064
+
+def test_get_kurs_timeout():
+    # Menguji apakah error Timeout dari library requests diubah menjadi ConnectionError kita
+    with patch("services.api_client.requests.get", side_effect=requests.exceptions.Timeout):
+        import pytest
+        with pytest.raises(ConnectionError):
+            get_kurs("USD")
+
+def test_mahasiswa_lulus_hanya_yang_lulus():
+    # Buat 3 mahasiswa dummy
+    m1 = Mahasiswa("Andi", "101", "andi@mail.com", 1)
+    m2 = Mahasiswa("Budi", "102", "budi@mail.com", 1)
+    m3 = Mahasiswa("Cita", "103", "cita@mail.com", 1)
+    
+    # Kita akali nilai akhirnya menggunakan MagicMock agar tidak perlu input nilai manual
+    m1.nilai_akhir = MagicMock(return_value=80.0)  # Lulus
+    m2.nilai_akhir = MagicMock(return_value=50.0)  # Tidak lulus
+    m3.nilai_akhir = MagicMock(return_value=75.0)  # Lulus
+    
+    hasil = mahasiswa_lulus([m1, m2, m3])
+    
+    # Pastikan yang return cuma 2 orang (Andi dan Cita)
+    assert len(hasil) == 2
+    assert m1 in hasil
+    assert m3 in hasil
+    assert m2 not in hasil
+
+def test_mahasiswa_lulus_diurutkan_nilai():
+    m1 = Mahasiswa("Andi", "101", "andi@mail.com", 1)
+    m2 = Mahasiswa("Budi", "102", "budi@mail.com", 1)
+    
+    # Andi dapat 70, Budi dapat 90
+    m1.nilai_akhir = MagicMock(return_value=70.0)
+    m2.nilai_akhir = MagicMock(return_value=90.0)
+    
+    hasil = mahasiswa_lulus([m1, m2])
+    
+    # Budi harusnya ada di urutan pertama (index 0) karena nilainya lebih tinggi
+    assert len(hasil) == 2
+    assert hasil[0] == m2
+    assert hasil[1] == m1
