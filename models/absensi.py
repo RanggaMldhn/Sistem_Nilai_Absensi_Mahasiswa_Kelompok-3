@@ -28,6 +28,10 @@ class Absensi:
         total_hadir = sum(1 for c in self._catatan if c.status.strip().lower() == 'hadir')
         return (total_hadir / len(self._catatan)) * 100
 
+    # 🟢 DITAMBAHKAN: Alias agar bisa dipanggil oleh main.py dan laporan.py
+    def persentase_hadir(self) -> float:
+        return self.hitung_persentase()
+
     def tampilkan(self) -> None:
         for c in self._catatan:
             print(c)
