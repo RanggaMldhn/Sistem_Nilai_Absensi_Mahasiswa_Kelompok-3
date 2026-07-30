@@ -8,7 +8,7 @@ def get_kurs(mata_uang_tujuan: str) -> float:
     
     try:
         # Request ke API dengan batas waktu 5 detik
-        response = requests.get(url, params=params, timeout=15)
+        response = requests.get(url, params=params, timeout=12)
         
         # Memicu HTTPError jika status response adalah 4xx atau 5xx
         response.raise_for_status() 
