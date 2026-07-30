@@ -3,14 +3,15 @@
 Ini adalah project program CLI berbasis Python (dengan konsep OOP) yang kita buat untuk mengelola data mahasiswa, mulai dari input nilai sampai pencatatan absen. 
 
 ## 👥 Anggota Kelompok
-* **Moh. Rozan Istazada Firdausy** - 25083000060 (Tugas: Menambahkan file dan branch Absensi dan Memperbaiki Error error yang terjadi pada vscode ini)
+* **Moh. Rozan Istazada Firdausy** - 25083000060 (Tugas: Menambahkan file dan branch Absensi dan Memperbaiki Error error yang terjadi pada vscode ini, dan juga membuat unit test)
 * **Rangga Maulidhani** - 25083000064 (Tugas: Menambahkan file file pertama serta branch dikarenakan ketua dan juga memperbaiki error error pada vscode serta membuat main.py)
-* **Arbi Maulana** - 25083000070 (Tugas: Menambahkan file akademik)
+* **Arbi Maulana** - 25083000070 (Tugas: Menambahkan file akademik, memperbaiki bug)
 
 ---
 
 ## 🚀 Cara Menjalankan Program
-Untuk mencoba programnya, buka terminal/command prompt di dalam folder project ini, terus jalankan:
+Untuk mencoba programnya, buka terminal/command prompt di dalam folder project ini atau bisa di atas kanan langsung play dan juga bisa ditekan f5 shortcut agar menjalankan program tersebut
+jika buka terminalnya bisa menulis ini dan menjalankannya:
 
 ```bash
 python main.py
@@ -24,7 +25,7 @@ python main.py
 Kita juga nyiapin *unit testing* buat mastiin fitur-fiturnya berjalan normal dan bebas *bug*. Cara test-nya tinggal ketik ini di terminal:
 
 ```bash
-python -m unittest tests/test_akademik.py
+python -m pytest tests/test_akademik.py
 
 ```
 
